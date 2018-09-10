@@ -50,16 +50,13 @@
 #include "main.h"
 #include "stm32f4xx_hal.h"
 #include "cmsis_os.h"
-#include "usb_host.h"
+#include "myTasks.h"
 
 /* USER CODE BEGIN Includes */
 
 /* USER CODE END Includes */
 
 /* Private variables ---------------------------------------------------------*/
-I2C_HandleTypeDef hi2c1;
-
-I2S_HandleTypeDef hi2s3;
 
 SPI_HandleTypeDef hspi1;
 
@@ -78,25 +75,14 @@ osMessageQId AccelDataHandle;
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_I2C1_Init(void);
-static void MX_I2S3_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_USART3_UART_Init(void);
-void StartDefaultTask(void const * argument);
-void StartAccelTask(void const * argument);
-void StartSerialTask(void const * argument);
+
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
 
 /* USER CODE END PFP */
-volatile unsigned long x = 0, y = 0;
-
-struct AccelRawData{
-	 int16_t osaX;
-	 int16_t osaY;
-	 int16_t osaZ;
-}AccelMsg;
 
 /* USER CODE BEGIN 0 */
 
@@ -131,8 +117,7 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_I2C1_Init();
-  MX_I2S3_Init();
+
   MX_SPI1_Init();
   MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
@@ -255,45 +240,7 @@ void SystemClock_Config(void)
   HAL_NVIC_SetPriority(SysTick_IRQn, 0, 0);
 }
 
-/* I2C1 init function */
-static void MX_I2C1_Init(void)
-{
 
-  hi2c1.Instance = I2C1;
-  hi2c1.Init.ClockSpeed = 100000;
-  hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
-  hi2c1.Init.OwnAddress1 = 0;
-  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
-  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
-  hi2c1.Init.OwnAddress2 = 0;
-  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
-  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
-  if (HAL_I2C_Init(&hi2c1) != HAL_OK)
-  {
-    _Error_Handler(__FILE__, __LINE__);
-  }
-
-}
-
-/* I2S3 init function */
-static void MX_I2S3_Init(void)
-{
-
-  hi2s3.Instance = SPI3;
-  hi2s3.Init.Mode = I2S_MODE_MASTER_TX;
-  hi2s3.Init.Standard = I2S_STANDARD_PHILIPS;
-  hi2s3.Init.DataFormat = I2S_DATAFORMAT_16B;
-  hi2s3.Init.MCLKOutput = I2S_MCLKOUTPUT_ENABLE;
-  hi2s3.Init.AudioFreq = I2S_AUDIOFREQ_96K;
-  hi2s3.Init.CPOL = I2S_CPOL_LOW;
-  hi2s3.Init.ClockSource = I2S_CLOCK_PLL;
-  hi2s3.Init.FullDuplexMode = I2S_FULLDUPLEXMODE_DISABLE;
-  if (HAL_I2S_Init(&hi2s3) != HAL_OK)
-  {
-    _Error_Handler(__FILE__, __LINE__);
-  }
-
-}
 
 /* SPI1 init function */
 static void MX_SPI1_Init(void)
@@ -455,125 +402,7 @@ void StartDefaultTask(void const * argument)
 }
 
 /* StartAccelTask function */
-void StartAccelTask(void const * argument)
-{
-	uint8_t registerAddress, data;
-		uint8_t osaXH,  osaYH, osaZH  ;//,osaYL,osaXL,osaZL; //Variables for AXES
-		struct AccelRawData * rawData; //Variables for puting LOW and HIGH byte together - but I read HIGHs only anyway
 
-		HAL_GPIO_WritePin(GPIOE, GPIO_PIN_3, GPIO_PIN_RESET); //Chip select
-		registerAddress = 0x20; //for CTRL_REG4
-		HAL_SPI_Transmit(&hspi1, &registerAddress, 1, 50);
-		data = 0x1F; //axis enable, dont update until you get new values, 3,125Hz output
-		HAL_SPI_Transmit(&hspi1, &data, 1, 50);
-		HAL_GPIO_WritePin(GPIOE, GPIO_PIN_3, GPIO_PIN_SET); //Chip select
-		HAL_Delay(50);
-
-
-		for(;;){
-
-			y++;
-			vTaskDelay(pdMS_TO_TICKS(50) );
-			//HAL_UART_Transmit(&huart3,"Accel\r\n",7,100);
-			//assert()
-			//vTaskSuspendAll();
-			//taskDISABLE_INTERRUPTS();
-			HAL_GPIO_WritePin(GPIOE, GPIO_PIN_3, GPIO_PIN_RESET);
-			registerAddress = 0x29+0x80;
-			HAL_SPI_Transmit(&hspi1, &registerAddress, 1, 50);
-			HAL_SPI_Receive(&hspi1, &osaXH, 1, 200);
-			HAL_GPIO_WritePin(GPIOE, GPIO_PIN_3, GPIO_PIN_SET);
-			HAL_Delay(10);
-
-			//READING HIGH BYTE OF Y AXIS
-			HAL_GPIO_WritePin(GPIOE, GPIO_PIN_3, GPIO_PIN_RESET);
-			registerAddress = 0x2B+0x80;
-			HAL_SPI_Transmit(&hspi1, &registerAddress, 1, 50);
-			HAL_SPI_Receive(&hspi1, &osaYH, 1, 200);
-			HAL_GPIO_WritePin(GPIOE, GPIO_PIN_3, GPIO_PIN_SET);
-			HAL_Delay(10);
-
-
-			//THIS ONE SHOULD NOT BE COMENTED, BUT WHEN I UNCOMENT IT SO IT READS VALUE IT DOES NOT WORK
-			//IT DOES NOT MATTER IF IT IS THIS Z AXIS OR ANY OTHER ONE
-			//READING HIGH BYTE OF Z AXIS
-			HAL_GPIO_WritePin(GPIOE, GPIO_PIN_3, GPIO_PIN_RESET);
-			registerAddress = 0x2D+0x80;
-			HAL_SPI_Transmit(&hspi1, &registerAddress, 1, 50);
-			HAL_SPI_Receive(&hspi1, &osaZH, 1, 200);
-			HAL_GPIO_WritePin(GPIOE, GPIO_PIN_3, GPIO_PIN_SET);
-
-
-			HAL_Delay(10);
-			//taskENABLE_INTERRUPTS();
-			//xTaskResumeAll();
-			//LCD_clear();
-
-			//Convert to 16 bit int
-			AccelMsg.osaX = (int16_t)osaXH <<8;  //| osaXL;
-			AccelMsg.osaY = (int16_t)osaYH <<8;  //| osaYL;
-			AccelMsg.osaZ = (int16_t)osaZH <<8;  //| osaZL;
-
-			rawData = &AccelMsg;
-			xQueueSend( AccelDataHandle,&rawData, 10 );
-
-
-		}
-}
-
-/* StartSerialTask function */
-void StartSerialTask(void const * argument)
-{
-			struct AccelRawData* rawData ;
-			float accelerationX, accelerationY, accelerationZ; //Result of calculation in g
-			//Char array for being able to print them on LCD
-			char toPrintY[5] = {0};
-			char toPrintX[5] = {0};
-			char toPrintZ[5] = {0};
-
-
-			for(;;){
-
-				x++;
-
-
-				vTaskDelay(pdMS_TO_TICKS(100) );
-				while(!xQueueReceive( AccelDataHandle, &rawData, 5))
-						;
-
-
-
-				accelerationX = ((2.0/65535.0) * rawData->osaX)*2;
-				accelerationY = ((2.0/65535.0) * rawData->osaY)*2;
-				accelerationZ = ((2.0/65535.0) * rawData->osaZ)*2;
-
-				//I DID THIS WITH LCD FTOA FUNCTION - to convert float to char array WITH THE SAME RESULT
-				snprintf(toPrintX, 6, "%0.3f", accelerationX);
-				snprintf(toPrintY, 6, "%0.3f", accelerationY);
-				snprintf(toPrintZ, 6, "%0.3f", accelerationZ);
-
-				//DISPLAYING LOOKS LIKE THIS
-				//X:x.xxg Y:x.xxg
-				//Z:x.xxg
-
-				//Printing X value
-				HAL_UART_Transmit(&huart3,"X:",2,100);
-				HAL_UART_Transmit(&huart3,toPrintX,6,100);
-				HAL_UART_Transmit(&huart3,"g ",2,100);
-
-				//Printing Y value
-
-				HAL_UART_Transmit(&huart3,"Y:",2,100);
-				HAL_UART_Transmit(&huart3,toPrintY,6,100);
-				HAL_UART_Transmit(&huart3,"g ",2,100);
-
-
-				//Printing Z value
-				HAL_UART_Transmit(&huart3,"Z:",2,100);
-				HAL_UART_Transmit(&huart3,toPrintZ,6,100);
-				HAL_UART_Transmit(&huart3,"g\r\n",3,100);
-			}
-}
 
 /**
   * @brief  Period elapsed callback in non blocking mode
