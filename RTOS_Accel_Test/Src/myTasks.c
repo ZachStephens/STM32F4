@@ -6,11 +6,19 @@
  */
 
 #include "myTasks.h"
+#include "arm_math.h"
+#include "stdio.h"
+#include "stdlib.h"
 
 
 extern SPI_HandleTypeDef hspi1;
 
 extern UART_HandleTypeDef huart3;
+
+
+
+void floatbuff(char*,float,unsigned char);
+
 
 void StartAccelTask(void const * argument)
 {
@@ -78,16 +86,18 @@ void StartAccelTask(void const * argument)
 		}
 }
 
+
+
 /* StartSerialTask function */
 void StartSerialTask(void const * argument)
 {
 			struct AccelRawData* rawData ;
 			float accelerationX, accelerationY, accelerationZ; //Result of calculation in g
 			//Char array for being able to print them on LCD
-			char toPrintY[5] = {0};
-			char toPrintX[5] = {0};
-			char toPrintZ[5] = {0};
-
+			char toPrintY[7] = {0};
+			char toPrintX[7] = {0};
+			char toPrintZ[7] = {0};
+				
 
 			for(;;){
 
@@ -104,10 +114,10 @@ void StartSerialTask(void const * argument)
 				accelerationY = ((2.0/65535.0) * rawData->osaY)*2;
 				accelerationZ = ((2.0/65535.0) * rawData->osaZ)*2;
 
-				//I DID THIS WITH LCD FTOA FUNCTION - to convert float to char array WITH THE SAME RESULT
-				snprintf(toPrintX, 6, "%0.3f", accelerationX);
-				snprintf(toPrintY, 6, "%0.3f", accelerationY);
-				snprintf(toPrintZ, 6, "%0.3f", accelerationZ);
+				
+				floatbuff(toPrintX,accelerationX, 3);
+				floatbuff(toPrintY,accelerationY, 3);
+				floatbuff(toPrintZ,accelerationZ, 3);
 
 
 
@@ -130,3 +140,34 @@ void StartSerialTask(void const * argument)
 			}
 }
 
+
+void floatbuff(char* dest,float Fval,uint8_t precision){
+	uint8_t destlen = precision + 2 + 1; 
+	float src = Fval;
+	uint8_t pos = 0;
+	float dec_pos = 10;
+	/*Take car of negative*/
+	if(src < 0){ 
+		dest[pos++] ='-';
+		src *=-1;
+	}
+	
+	while(pos < destlen){
+		float src_tmp = 0;
+		if(src >= dec_pos){
+			src_tmp = src / dec_pos;
+			src -= (unsigned char)src_tmp*dec_pos;
+		}
+
+		/*convert digit to char*/
+		dest[pos++] = 48 + (unsigned char) src_tmp;		
+			
+		if(dec_pos == 1) dest[pos++] = '.';
+
+		/*compare next decimal place*/
+		dec_pos /=10;
+		
+		
+	}
+		
+}

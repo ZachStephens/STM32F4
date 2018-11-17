@@ -387,19 +387,19 @@ static void MX_GPIO_Init(void)
 /* USER CODE END 4 */
 
 /* StartDefaultTask function */
-void StartDefaultTask(void const * argument)
+/*void StartDefaultTask(void const * argument)
 {
   /* init code for USB_HOST */
   //MX_USB_HOST_Init();
 
   /* USER CODE BEGIN 5 */
   /* Infinite loop */
-  for(;;)
+  /*for(;;)
   {
     osDelay(1);
   }
   /* USER CODE END 5 */ 
-}
+//}
 
 /* StartAccelTask function */
 
